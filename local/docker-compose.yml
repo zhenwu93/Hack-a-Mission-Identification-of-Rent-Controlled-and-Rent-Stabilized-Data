@@ -1,0 +1,64 @@
+version: '3'
+
+services:
+  database:
+    image: 'postgres:latest'
+    container_name: project_db
+    ports:
+      - 5432:5432
+    networks:
+      - common-network
+    volumes:
+      - ./db-data/:/var/lib/postgresql/data/
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      POSTGRES_USER: postgres # The PostgreSQL user (useful to connect to the database)
+      POSTGRES_PASSWORD: postgres # The PostgreSQL password (useful to connect to the database)
+      POSTGRES_DB: postgres # The PostgreSQL default database (automatically created at first launch)
+#  pgadmin:
+#    image: dpage/pgadmin4
+#    ports:
+#      - 15432:15432
+#    depends_on:
+#      - database
+#    networks:
+#      - postgres-network
+#    volumes:
+#      - ${PWD}/pgadmin-data/:/var/lib/pgadmin/
+  lambda:
+      container_name: project_lambda
+      build:
+        context: ./
+        dockerfile: Dockerfile
+      ports:
+        - "9000:8080"
+      volumes:
+        - ../.aws-lambda-rie:/aws-lambda
+      command: "/app/main" # Using "/app/main" as the command to execute the lambda test locally.
+      #      entrypoint: /lambda-entrypoint.sh myfunction.lambda_handler # Utilizing the RIE as the entrypoint for local lambda testing.
+      environment:
+        - AWS_ACCESS_KEY_ID=your_access_key # Define the AWS Access Key ID as an environment variable.
+        - AWS_SECRET_ACCESS_KEY=your_secret_key # Define the AWS Secret Access Key as an environment variable.
+        - AWS_BUCKET_NAME=your_bucket_name # Define the AWS Bucket Name as an environment variable.
+      networks:
+        - common-network
+
+  jupyter:
+    build: 
+      context: .
+      dockerfile: ./docker/jupyter/Dockerfile
+    volumes:
+      - ./work:/home/jovyan/work
+    ports:
+      - 8888:8888
+    container_name: jupyter_notebook
+    command: "start-notebook.sh --NotebookApp.token="
+    networks:
+      - common-network
+
+networks:
+  common-network:
+    driver: bridge
+
+  services:
+

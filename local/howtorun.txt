@@ -1,0 +1,4 @@
+docker run -d -v ~/.aws-lambda-rie:/aws-lambda -p 9000:8080 --entrypoint ./aws-lambda-rie myfunction:latest
+docker-compose up --force-recreate --build -d
+docker-compose -f docker-compose.yml up
+Invoke-WebRequest -Uri "http://localhost:9000/2015-03-31/functions/function/invocations" -Method Post -Body '{}' -ContentType "application/json"
