@@ -136,25 +136,20 @@ def clean_up_global_vars():
 def parse_five_boroughs_pdfs():
     for borough in BoroughIdentifiers:
         # only add data to the array if the borough is Staten Island  TEMPORARY
-        if borough == BoroughIdentifiers.STATEN_ISLAND:
+        # if borough == BoroughIdentifiers.STATEN_ISLAND:
 
-            add_borough_data_to_arr(borough.value[0], borough.value[1])
-            clean_up_global_vars()
+        add_borough_data_to_arr(borough.value[0], borough.value[1])
+        clean_up_global_vars()
 
     #create_csv(all_data_to_insert, 'five_boroughs.csv');
 
 def create_bbl_column(data_frame):
     BBL = 'BBL'
-    data_frame2 = data_frame.copy()  # Create a copy of the DataFrame to avoid modifying the original dataset
-    data_frame2[RentStabFeatures.BLOCK.name].fillna(88888888, inplace=True)
-    data_frame2[RentStabFeatures.LOT.name].fillna(88888888, inplace=True)
-    data_frame2[RentStabFeatures.BLOCK.name] = data_frame[RentStabFeatures.BLOCK.name].astype(int)
-    data_frame2[RentStabFeatures.LOT.name] = data_frame[RentStabFeatures.LOT.name].astype(int)
-    data_frame2[BBL] = data_frame[RentStabFeatures.BOROUGH_ID.name].astype(str) + data_frame[RentStabFeatures.BLOCK.name].astype(str) + data_frame[RentStabFeatures.LOT.name].astype(str)
-    data_frame2[BBL] = data_frame[BBL].apply(lambda x: pd.NA if '88888888' in x else x)
-    data_frame2[RentStabFeatures.BLOCK.name] = data_frame[RentStabFeatures.BLOCK.name].apply(lambda x: pd.NA if x == 88888888 else x)
-    data_frame2[RentStabFeatures.LOT.name] = data_frame[RentStabFeatures.LOT.name].apply(lambda x: pd.NA if x == 88888888 else x)
-    print(data_frame.head())
+    data_frame['BBL'] = data_frame.apply(lambda row: str(row[RentStabFeatures.BOROUGH_ID.name])
+                                         + str(row[RentStabFeatures.BLOCK.name])
+                                         + str(row[RentStabFeatures.LOT.name])
+                                         if row[RentStabFeatures.BLOCK.name] and row[RentStabFeatures.LOT.name] else '', axis=1)
+
     return data_frame
 
 def lambda_handler(event, context):
@@ -163,9 +158,12 @@ def lambda_handler(event, context):
         print(db)
         print(session)
         parse_five_boroughs_pdfs()
+        # print (all_data_to_insert[0])
+        # print (all_data_to_insert[-2])
+        print ('TEST THE WATERS')
         df = pd.DataFrame(all_data_to_insert, columns = RentStabFeatures.__members__.keys())
         # TODO: having trouble with the bbl column.  was working in the jupyter notebook but not here
-        # df = create_bbl_column(df)
+        df = create_bbl_column(df)
         df.to_sql('test', db, if_exists='replace', index=False)
         
     except (Exception, psycopg2.Error) as error:
