@@ -10,12 +10,14 @@ from enum import Enum
 import pypdf
 import csv
 from sqlalchemy import create_engine
+from sqlalchemy.types import BigInteger
 from psql import Base, db, session
 
 # globals
 parts = []
 rows_with_extra_elements = []
 all_data_to_insert = []
+RENT_STAB_BLDG_LISTINGS = 'rentstabbldglistings'
 
 class BoroughIdentifiers(Enum):
     MANHATTAN = ('1', './rent-stab-pdfs/2022-DHCR-Manhattan.pdf')
@@ -48,33 +50,31 @@ def visitor_body(text, cm, tm, font_dict, font_size):
     if y > 25 and y < 865 and text and text not in RentStabFeatures.__members__:
         parts.append((text, x, y))
 
-def create_csv(data, filename):
-    with open(filename, 'w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerows(data)
-
 def split_data(data):
+    """Split the data into arrays each time it encounters the LOT feature"""
     result = []
     current_array = []
     for item in data:
         current_array.append(item)
-        # issue caused by the data that does not have a lot
         if item[1] == RentStabFeatures.LOT.value:
             result.append(current_array)
             current_array = []
     return result
 
 def fill_empty_features(data, borough_id):
+    """Fill the empty features in each sample with None values. Add the borough_id to each sample."""
     for array in data:
         for feature in RentStabFeatures:
             if (feature == RentStabFeatures.BOROUGH_ID):
                 array.append((borough_id, feature.value))
             if not any(feature.value == item[1] for item in array):
-                array.append(('', feature.value))
+                array.append((None, feature.value))
         array.sort(key=lambda x: x[1])
     return data
 
 def remove_extra_elements(data):
+    """Separate the arrays that contain more than the number of features in RentStabFeatures enum.
+    These arrays will be further split into separate arrays using a different process than the one used in split_data."""
     result = []
     for array in data:
         if len(array) > len(RentStabFeatures):
@@ -84,6 +84,7 @@ def remove_extra_elements(data):
     return result
 
 def remove_tuple_data(data):
+    """Clear the tuple data that has been used to keep track of the samples position in the PDF."""
     return [[item[0] for item in array] for array in data]
 
 def get_arr_of_rent_stab_data_rows(pdf_name, visitor_function, borough_id):
@@ -99,6 +100,7 @@ def get_arr_of_rent_stab_data_rows(pdf_name, visitor_function, borough_id):
         return remove_tuple_data(remove_extra_elements(fill_empty_features(split_data(parts), borough_id)))
 
 def create_dict(data):
+    """Hard to explain ATM, will update later."""
     result = {}
     for i, row in enumerate(data):
         key = 'fnma' + str(i)
@@ -106,12 +108,17 @@ def create_dict(data):
     return result
 
 def split_rows_with_extra_elements(data):
+    """Performs parsing specific to the rows that have more elements than the RentStabFeatures enum.
+    This situation occurs when there are rows in the data that are missing the LOT feature."""
     result = {}
     for item in data:
+        # shed the borough_id and the empty cells
         if len(item) < 3:
             continue
+        # if the key is not in the result dictionary, add it
         elif item[2] not in result:
             result[item[2]] = []
+        # for items that have all 3 tuple elements, append their value and feature coordinates to the result dictionary
         if not len(item) < 3:
             result[item[2]].append((item[0], item[1]))
     return [result[key] for key in result]
@@ -135,22 +142,33 @@ def clean_up_global_vars():
 
 def parse_five_boroughs_pdfs():
     for borough in BoroughIdentifiers:
-        # only add data to the array if the borough is Staten Island  TEMPORARY
-        # if borough == BoroughIdentifiers.STATEN_ISLAND:
-
         add_borough_data_to_arr(borough.value[0], borough.value[1])
         clean_up_global_vars()
-
-    #create_csv(all_data_to_insert, 'five_boroughs.csv');
 
 def create_bbl_column(data_frame):
     BBL = 'BBL'
     data_frame['BBL'] = data_frame.apply(lambda row: str(row[RentStabFeatures.BOROUGH_ID.name])
                                          + str(row[RentStabFeatures.BLOCK.name])
                                          + str(row[RentStabFeatures.LOT.name])
-                                         if row[RentStabFeatures.BLOCK.name] and row[RentStabFeatures.LOT.name] else '', axis=1)
-
+                                         if row[RentStabFeatures.BLOCK.name] and row[RentStabFeatures.LOT.name] else None, axis=1)
     return data_frame
+
+def create_and_hidrate_db():
+    summary_df = pd.read_csv('./nycdb-csvs/changes-summary.csv')
+    summary_df.to_sql('rentstab', db, if_exists='replace')
+    joined_df = pd.read_csv('./nycdb-csvs/joined.csv')
+    joined_df.to_sql('rentstab_summary', db, if_exists='replace')
+    rentstab_counts_df = pd.read_csv('./nycdb-csvs/rentstab_counts_from_doffer_2022.csv')
+    rentstab_counts_df.to_sql('rentstab_v2', db, if_exists='replace')
+
+def build_relationships():
+    print('x')
+    curs = session.connection().connection.cursor()
+    curs.execute('SELECT "BBL" FROM rentstabbldglistings LIMIT 5')
+    results = curs.fetchall()
+    print(results)
+
+    # print(curs.execute('SELECT "BBL" FROM rentstabbldglistings LIMIT 20').fetchall())
 
 def lambda_handler(event, context):
     try :
@@ -158,13 +176,12 @@ def lambda_handler(event, context):
         print(db)
         print(session)
         parse_five_boroughs_pdfs()
-        # print (all_data_to_insert[0])
-        # print (all_data_to_insert[-2])
-        print ('TEST THE WATERS')
         df = pd.DataFrame(all_data_to_insert, columns = RentStabFeatures.__members__.keys())
-        # TODO: having trouble with the bbl column.  was working in the jupyter notebook but not here
         df = create_bbl_column(df)
-        df.to_sql('test', db, if_exists='replace', index=False)
+        df.to_sql(RENT_STAB_BLDG_LISTINGS, db, if_exists='replace', dtype={"BBL": BigInteger()})
+        create_and_hidrate_db()
+        # TODO: create relationships between RENT_STAB_BLDG_LISTINGS and the other tables
+        build_relationships()
         
     except (Exception, psycopg2.Error) as error:
         print("Error while creating the database", error)
@@ -177,7 +194,7 @@ def lambda_handler(event, context):
             print("Database connection closed")
 
 def connect(config):
-    """ Connect to the PostgreSQL database server - is the old non-sqlalchemy way of connecting to the database used only when script executed directly"""
+    """Connect to the PostgreSQL database server - is the old non-sqlalchemy way of connecting to the database used only when script executed directly"""
     try:
         # connecting to the PostgreSQL server
         with psycopg2.connect(**config) as conn:
