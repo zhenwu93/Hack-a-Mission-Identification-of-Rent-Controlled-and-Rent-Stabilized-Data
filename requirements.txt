@@ -1,0 +1,6 @@
+boto3
+pandas
+psycopg2-binary
+pypdf
+sqlalchemy
+sqlalchemy-utils
