@@ -1,5 +1,5 @@
 # Hack-a-Mission-Identification-of-Rent-Controlled-and-Rent-Stabilized-Data
-# Project Name
+# New York City rent subsidized housing data
 
 ## Table of Contents
 
@@ -13,7 +13,7 @@
 
 ## Description
 
-A brief description of your project, what it does, and its purpose.
+this project combines rent stabilized housing data available in PDFs as well as publicly available data files, combines them using the primary identifier and exposes them to API in order to allow users to search using an address as well as publish them to the public visual dashboards.
 
 ## Features
 
