@@ -27,27 +27,29 @@ class BoroughIdentifiers(Enum):
     STATEN_ISLAND = ('5', './rent-stab-pdfs/2022-DHCR-Staten-Island.pdf')
 
 class RentStabFeatures(Enum):
-    ZIP = 25.0
-    BLDGNO1 = 75.0
-    STREET1 = 185.0
-    STSUFX1 = 312.0
-    BLDGNO2 = 372.0
-    STREET2 = 451.0
-    STSUFX2 = 567.0
-    CITY = 619.0
-    COUNTY = 702.0
-    STATUS1 = 769.0
-    STATUS2 = 879.0
-    STATUS3 = 980.0
-    BLOCK = 1079.0
-    LOT = 1143.0
-    BOROUGH_ID = 2024.0
+    zip = 25.0
+    bldgno1 = 75.0
+    street1 = 185.0
+    stsufx1 = 312.0
+    bldgno2 = 372.0
+    street2 = 451.0
+    stsufx2 = 567.0
+    city = 619.0
+    county = 702.0
+    status1 = 769.0
+    status2 = 879.0
+    status3 = 980.0
+    block = 1079.0
+    lot = 1143.0
+    boroughid = 2024.0
+
+names_as_appear_in_pdf = ['ZIP', 'BLDGNO1', 'STREET1', 'STSUFX1', 'BLDGNO2', 'STREET2', 'STSUFX2', 'CITY', 'COUNTY', 'STATUS1', 'STATUS2', 'STATUS3', 'BLOCK', 'LOT']
 
 def visitor_body(text, cm, tm, font_dict, font_size):
     """Visitor function for extracting text from the body of the PDF"""
     y = tm[5]
     x = tm[4]
-    if y > 25 and y < 865 and text and text not in RentStabFeatures.__members__:
+    if y > 25 and y < 865 and text and text not in names_as_appear_in_pdf:
         parts.append((text, x, y))
 
 def split_data(data):
@@ -56,7 +58,7 @@ def split_data(data):
     current_array = []
     for item in data:
         current_array.append(item)
-        if item[1] == RentStabFeatures.LOT.value:
+        if item[1] == RentStabFeatures.lot.value:
             result.append(current_array)
             current_array = []
     return result
@@ -65,7 +67,7 @@ def fill_empty_features(data, borough_id):
     """Fill the empty features in each sample with None values. Add the borough_id to each sample."""
     for array in data:
         for feature in RentStabFeatures:
-            if (feature == RentStabFeatures.BOROUGH_ID):
+            if (feature == RentStabFeatures.boroughid):
                 array.append((borough_id, feature.value))
             if not any(feature.value == item[1] for item in array):
                 array.append((None, feature.value))
@@ -147,10 +149,10 @@ def parse_five_boroughs_pdfs():
 
 def create_bbl_column(data_frame):
     ucbbl = 'ucbbl'
-    data_frame['ucbbl'] = data_frame.apply(lambda row: str(row[RentStabFeatures.BOROUGH_ID.name])
-                                         + str(row[RentStabFeatures.BLOCK.name])
-                                         + str(row[RentStabFeatures.LOT.name])
-                                         if row[RentStabFeatures.BLOCK.name] and row[RentStabFeatures.LOT.name] else None, axis=1)
+    data_frame['ucbbl'] = data_frame.apply(lambda row: str(row[RentStabFeatures.boroughid.name])
+                                         + str(row[RentStabFeatures.block.name])
+                                         + str(row[RentStabFeatures.lot.name])
+                                         if row[RentStabFeatures.block.name] and row[RentStabFeatures.lot.name] else None, axis=1)
     return data_frame
 
 def create_and_hidrate_db():
