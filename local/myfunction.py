@@ -146,8 +146,8 @@ def parse_five_boroughs_pdfs():
         clean_up_global_vars()
 
 def create_bbl_column(data_frame):
-    BBL = 'BBL'
-    data_frame['BBL'] = data_frame.apply(lambda row: str(row[RentStabFeatures.BOROUGH_ID.name])
+    ucbbl = 'ucbbl'
+    data_frame['ucbbl'] = data_frame.apply(lambda row: str(row[RentStabFeatures.BOROUGH_ID.name])
                                          + str(row[RentStabFeatures.BLOCK.name])
                                          + str(row[RentStabFeatures.LOT.name])
                                          if row[RentStabFeatures.BLOCK.name] and row[RentStabFeatures.LOT.name] else None, axis=1)
@@ -162,9 +162,19 @@ def create_and_hidrate_db():
     rentstab_counts_df.to_sql('rentstab_v2', db, if_exists='replace')
 
 def build_relationships():
-    print('x')
+    print('INSIDE BUILD RELATIONSHIPS')
     curs = session.connection().connection.cursor()
-    curs.execute('SELECT "BBL" FROM rentstabbldglistings LIMIT 5')
+    print('ALL ROWS rentstabbldglistings: ')
+    curs.execute('SELECT ucbbl FROM rentstabbldglistings LIMIT 5')
+    # print('ALL ROWS rentstab_summary: ')
+    # curs.execute('SELECT * FROM rentstab_summary LIMIT 5')
+    # print('ALL ROWS rentstab: ')
+    # curs.execute('SELECT * FROM rentstab LIMIT 5')
+    # print('ALL ROWS rentstab_v2: ')
+    # curs.execute('SELECT * FROM rentstab_v2 LIMIT 5')
+    # print('results: ')
+    # Join all tables by ucbbl field
+    
     results = curs.fetchall()
     print(results)
 
@@ -178,7 +188,7 @@ def lambda_handler(event, context):
         parse_five_boroughs_pdfs()
         df = pd.DataFrame(all_data_to_insert, columns = RentStabFeatures.__members__.keys())
         df = create_bbl_column(df)
-        df.to_sql(RENT_STAB_BLDG_LISTINGS, db, if_exists='replace', dtype={"BBL": BigInteger()})
+        df.to_sql(RENT_STAB_BLDG_LISTINGS, db, if_exists='replace', dtype={'ucbbl': BigInteger()})
         create_and_hidrate_db()
         # TODO: create relationships between RENT_STAB_BLDG_LISTINGS and the other tables
         build_relationships()
