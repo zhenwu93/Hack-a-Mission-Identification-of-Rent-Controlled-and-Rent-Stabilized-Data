@@ -147,12 +147,26 @@ def parse_five_boroughs_pdfs():
         add_borough_data_to_arr(borough.value[0], borough.value[1])
         clean_up_global_vars()
 
-def create_bbl_column(data_frame):
-    ucbbl = 'ucbbl'
-    data_frame['ucbbl'] = data_frame.apply(lambda row: str(row[RentStabFeatures.boroughid.name])
-                                         + str(row[RentStabFeatures.block.name])
-                                         + str(row[RentStabFeatures.lot.name])
-                                         if row[RentStabFeatures.block.name] and row[RentStabFeatures.lot.name] else None, axis=1)
+# import pandas as pd
+
+# class RentStabFeatures:
+#     boroughid = 'boroughid'
+#     block = 'block'
+#     lot = 'lot'
+
+def create_bbl_column(data_frame: pd.DataFrame) -> pd.DataFrame:
+    def generate_ucbbl(row):
+        boroughid = str(row[RentStabFeatures.boroughid.name]).zfill(1)  # Assuming boroughid should be 1 digit
+        block = str(row[RentStabFeatures.block.name]).zfill(5)  # Assuming block should be 5 digits
+        lot = str(row[RentStabFeatures.lot.name]).zfill(4)  # Assuming lot should be 4 digits
+        
+        # Validate the inputs (example: check if they are numeric and within a certain range)
+        if boroughid.isdigit() and block.isdigit() and lot.isdigit():
+            return f"{boroughid}{block}{lot}"
+        else:
+            return None
+
+    data_frame['ucbbl'] = data_frame.apply(generate_ucbbl, axis=1)
     return data_frame
 
 def create_and_hidrate_db():
